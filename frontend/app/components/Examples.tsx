@@ -1,80 +1,61 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Clock, Tag } from 'lucide-react';
+import { Play, Clock, Tag, Loader2 } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { api, type ExampleItem } from '~/services/api';
 
 export function Examples() {
   const [activeCategory, setActiveCategory] = React.useState('all');
+  const [examples, setExamples] = React.useState<ExampleItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const categories = [
-    { id: 'all', label: 'All Examples' },
-    { id: 'algebra', label: 'Algebra' },
-    { id: 'geometry', label: 'Geometry' },
-    { id: 'calculus', label: 'Calculus' },
-    { id: 'physics', label: 'Physics' }
-  ];
+  // Load examples from API
+  React.useEffect(() => {
+    const loadExamples = async () => {
+      try {
+        setLoading(true);
+        const response = await api.getExamples();
+        setExamples(response.examples);
+        setError(null);
+      } catch (error) {
+        console.error('Failed to load examples:', error);
+        setError('Failed to load examples');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const examples = [
-    {
-      id: 1,
-      title: 'Vector Addition & Subtraction',
-      category: 'algebra',
-      duration: '45s',
-      thumbnail: '/api/placeholder/400/225',
-      description: 'Visual demonstration of vector operations in 2D space',
-      prompt: 'Show how vectors add and subtract with animated arrows'
-    },
-    {
-      id: 2,
-      title: 'Hyperbola & Foci',
-      category: 'geometry',
-      duration: '60s',
-      thumbnail: '/api/placeholder/400/225',
-      description: 'Interactive visualization of hyperbola properties',
-      prompt: 'Animate a hyperbola showing its foci and asymptotes'
-    },
-    {
-      id: 3,
-      title: 'Derivative Visualization',
-      category: 'calculus',
-      duration: '90s',
-      thumbnail: '/api/placeholder/400/225',
-      description: 'Tangent line moving along a curve',
-      prompt: 'Show the derivative of x² with a moving tangent line'
-    },
-    {
-      id: 4,
-      title: 'Pythagorean Theorem',
-      category: 'geometry',
-      duration: '30s',
-      thumbnail: '/api/placeholder/400/225',
-      description: 'Classic proof with area visualization',
-      prompt: 'Animate the Pythagorean theorem proof using squares'
-    },
-    {
-      id: 5,
-      title: 'Simple Harmonic Motion',
-      category: 'physics',
-      duration: '75s',
-      thumbnail: '/api/placeholder/400/225',
-      description: 'Oscillating spring and sine wave connection',
-      prompt: 'Show simple harmonic motion with spring and graph'
-    },
-    {
-      id: 6,
-      title: 'Matrix Multiplication',
-      category: 'algebra',
-      duration: '50s',
-      thumbnail: '/api/placeholder/400/225',
-      description: 'Step-by-step matrix multiplication',
-      prompt: 'Visualize 3x3 matrix multiplication step by step'
+    loadExamples();
+  }, []);
+
+  const categories = React.useMemo(() => {
+    if (examples.length === 0) {
+      return [
+        { id: 'all', label: 'All Examples' },
+        { id: 'algebra', label: 'Algebra' },
+        { id: 'geometry', label: 'Geometry' },
+        { id: 'calculus', label: 'Calculus' },
+        { id: 'physics', label: 'Physics' }
+      ];
     }
-  ];
+    
+    const uniqueCategories = [...new Set(examples.map(ex => ex.category))];
+    return [
+      { id: 'all', label: 'All Examples' },
+      ...uniqueCategories.map(cat => ({
+        id: cat,
+        label: cat.charAt(0).toUpperCase() + cat.slice(1)
+      }))
+    ];
+  }, [examples]);
 
-  const filteredExamples = activeCategory === 'all' 
-    ? examples 
-    : examples.filter(ex => ex.category === activeCategory);
+  const filteredExamples = React.useMemo(() => {
+    return activeCategory === 'all' 
+      ? examples 
+      : examples.filter(ex => ex.category === activeCategory);
+  }, [examples, activeCategory]);
 
   return (
     <section id="examples" className="py-20 bg-gray-50 dark:bg-gray-900/50">
@@ -125,16 +106,37 @@ export function Examples() {
           ))}
         </motion.div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center py-16">
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Loading examples...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-16">
+            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        )}
+
         {/* Examples grid */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
-          {filteredExamples.map((example, index) => (
+        {!loading && !error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
+            {filteredExamples.map((example, index) => (
             <motion.div
-              key={example.id}
+              key={`${example.title}-${index}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -181,27 +183,46 @@ export function Examples() {
                     </p>
                   </div>
 
-                  <Button variant="outline" size="sm" className="w-full">
-                    View Details
-                  </Button>
+                  <a href={`/generate?prompt=${encodeURIComponent(example.prompt)}`}>
+                    <Button variant="outline" size="sm" className="w-full">
+                      Try This Prompt
+                    </Button>
+                  </a>
                 </div>
               </Card>
             </motion.div>
           ))}
-        </motion.div>
+          </motion.div>
+        )}
+
+        {/* Empty state for filtered results */}
+        {!loading && !error && filteredExamples.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
+              No examples found for "{activeCategory}" category.
+            </p>
+            <Button onClick={() => setActiveCategory('all')} variant="outline">
+              Show All Examples
+            </Button>
+          </div>
+        )}
 
         {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          viewport={{ once: true }}
-          className="text-center mt-12"
-        >
-          <Button variant="primary" size="lg">
-            Create Your Own Animation
-          </Button>
-        </motion.div>
+        {!loading && !error && examples.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            viewport={{ once: true }}
+            className="text-center mt-12"
+          >
+            <a href="/generate">
+              <Button variant="primary" size="lg">
+                Create Your Own Animation
+              </Button>
+            </a>
+          </motion.div>
+        )}
       </div>
     </section>
   );

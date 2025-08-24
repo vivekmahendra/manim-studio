@@ -26,11 +26,13 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_RENDERS: int = 3
     
     # CORS settings
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    CORS_ORIGINS: str = "*"
     
     @property
     def cors_origins(self) -> list:
         """Parse CORS_ORIGINS string into list"""
+        if self.CORS_ORIGINS == "*":
+            return ["*"]
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
     class Config:

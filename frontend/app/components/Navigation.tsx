@@ -33,7 +33,7 @@ export function Navigation() {
   const navLinks = [
     { href: '#features', label: 'Features' },
     { href: '#how-it-works', label: 'How it Works' },
-    { href: '#examples', label: 'Examples' },
+    { href: '/examples', label: 'Examples' },
     { href: '#pricing', label: 'Pricing' },
   ];
 
@@ -80,9 +80,11 @@ export function Navigation() {
             >
               {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
-            <Button variant="primary" size="md">
-              Get Started
-            </Button>
+            <a href="/generate">
+              <Button variant="primary" size="md">
+                Get Started
+              </Button>
+            </a>
           </div>
 
           {/* Mobile menu button */}
@@ -120,9 +122,11 @@ export function Navigation() {
               </a>
             ))}
             <div className="pt-2">
-              <Button variant="primary" size="md" className="w-full">
-                Get Started
-              </Button>
+              <a href="/generate" className="block">
+                <Button variant="primary" size="md" className="w-full">
+                  Get Started
+                </Button>
+              </a>
             </div>
           </div>
         </div>

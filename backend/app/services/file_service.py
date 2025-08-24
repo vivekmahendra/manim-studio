@@ -28,20 +28,39 @@ class FileService:
         
         if not media_videos_path.exists():
             return None
-            
-        # Look for directories matching the scene name (case insensitive)
+        
+        # Convert CamelCase scene name to snake_case for matching
+        def camel_to_snake(name):
+            import re
+            # Insert underscore before uppercase letters (except the first one)
+            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+            # Insert underscore before uppercase letters preceded by lowercase
+            return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+        
+        snake_case_scene = camel_to_snake(scene_name)
+        
+        # Look for directories matching the scene name
         for video_dir in media_videos_path.iterdir():
-            if video_dir.is_dir() and scene_name.lower() in video_dir.name.lower():
-                # Look for the actual video file
-                quality_dirs = ["480p15", "720p30", "1080p60"]
+            if video_dir.is_dir():
+                dir_name = video_dir.name.lower()
+                scene_lower = scene_name.lower()
                 
-                for quality_dir in quality_dirs:
-                    quality_path = video_dir / quality_dir
-                    if quality_path.exists():
-                        # Look for mp4 files
-                        for video_file in quality_path.glob("*.mp4"):
-                            # Return relative path from media directory
-                            return f"videos/{video_dir.name}/{quality_dir}/{video_file.name}"
+                # Try multiple matching strategies
+                if (dir_name == snake_case_scene or  # Exact snake_case match
+                    dir_name == scene_lower or       # Exact lowercase match
+                    scene_lower in dir_name or       # Scene name contained in dir
+                    dir_name in scene_lower):        # Dir name contained in scene
+                    
+                    # Look for the actual video file
+                    quality_dirs = ["480p15", "720p30", "1080p60"]
+                    
+                    for quality_dir in quality_dirs:
+                        quality_path = video_dir / quality_dir
+                        if quality_path.exists():
+                            # Look for mp4 files
+                            for video_file in quality_path.glob("*.mp4"):
+                                # Return relative path from media directory
+                                return f"videos/{video_dir.name}/{quality_dir}/{video_file.name}"
         
         return None
     

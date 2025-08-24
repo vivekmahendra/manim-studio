@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router';
 import { ArrowRight, Play, Sparkles, Zap } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
 export function Hero() {
+  const navigate = useNavigate();
   const [prompt, setPrompt] = React.useState('');
   const [isGenerating, setIsGenerating] = React.useState(false);
 
@@ -16,9 +18,15 @@ export function Hero() {
   ];
 
   const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    
     setIsGenerating(true);
-    // Simulate generation
-    setTimeout(() => setIsGenerating(false), 2000);
+    // Navigate to generation page with prompt
+    navigate(`/generate?prompt=${encodeURIComponent(prompt.trim())}`);
+  };
+
+  const handleExampleClick = (examplePrompt: string) => {
+    setPrompt(examplePrompt);
   };
 
   const mathSymbols = ['∫', 'Σ', '∂', '∇', 'π', '∞', '√', 'α', 'β', 'θ'];
@@ -35,12 +43,12 @@ export function Hero() {
             key={i}
             className="absolute text-4xl text-blue-200 dark:text-blue-900 opacity-20"
             initial={{ 
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight 
+              x: Math.random() * 1200,
+              y: Math.random() * 800 
             }}
             animate={{
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
+              x: Math.random() * 1200,
+              y: Math.random() * 800,
             }}
             transition={{
               duration: 20 + Math.random() * 10,
@@ -107,11 +115,17 @@ export function Hero() {
                   placeholder="Describe your mathematical concept..."
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleGenerate();
+                    }
+                  }}
                   className="flex-1"
                 />
                 <Button 
                   onClick={handleGenerate}
-                  disabled={isGenerating}
+                  disabled={isGenerating || !prompt.trim()}
                   className="sm:w-auto"
                 >
                   {isGenerating ? (
@@ -135,7 +149,7 @@ export function Hero() {
                   {examplePrompts.map((example, i) => (
                     <button
                       key={i}
-                      onClick={() => setPrompt(example)}
+                      onClick={() => handleExampleClick(example)}
                       className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
                     >
                       {example}
