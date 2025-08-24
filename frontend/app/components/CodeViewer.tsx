@@ -180,48 +180,23 @@ export function CodeViewer({
       </div>
 
       {/* Code content */}
-      <div className="relative">
-        <AnimatePresence>
-          <motion.div
-            key={isExpanded ? 'expanded' : 'collapsed'}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={clsx(
-              'bg-gray-50 dark:bg-gray-900 overflow-auto',
-              isExpanded ? 'max-h-96' : 'max-h-60'
-            )}
-          >
-            <pre className="p-4 text-sm leading-relaxed">
-              <code 
-                className="text-gray-900 dark:text-gray-100 font-mono"
-                dangerouslySetInnerHTML={{ __html: previewHighlighted }}
-              />
-            </pre>
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Fade overlay when collapsed */}
-        {!isExpanded && lineCount > previewLines && (
-          <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-50 dark:from-gray-900 to-transparent pointer-events-none" />
-        )}
-
-        {/* Expand prompt */}
-        {!isExpanded && lineCount > previewLines && (
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsExpanded(true)}
-              className="text-xs bg-white dark:bg-gray-800 shadow-sm"
+      {isExpanded && (
+        <div className="relative">
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-gray-50 dark:bg-gray-900 overflow-auto max-h-96"
             >
-              Show {lineCount - previewLines} more lines
-              <ChevronDown className="h-3 w-3 ml-1" />
-            </Button>
-          </div>
-        )}
-      </div>
+              <pre className="p-4 text-sm leading-relaxed text-gray-900 dark:text-gray-100 font-mono whitespace-pre-wrap">
+                {code}
+              </pre>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Code info */}
       <div className="bg-gray-50 dark:bg-gray-900 px-4 py-2 border-t border-gray-200 dark:border-gray-800">
