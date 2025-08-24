@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Dict, Any
 import logging
+import asyncio
+import uuid
+from datetime import datetime
 
 from ...models.schemas import (
     GenerateRequest, 
@@ -8,7 +11,9 @@ from ...models.schemas import (
     ExampleResponse, 
     ExampleItem,
     HealthResponse,
-    ErrorResponse
+    ErrorResponse,
+    ProgressResponse,
+    JobStatusResponse
 )
 from ...services.ai_service import ai_service
 from ...services.manim_service import manim_service
@@ -20,56 +25,171 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# In-memory job storage (in production, use Redis or database)
+job_storage: Dict[str, Dict[str, Any]] = {}
+
+async def update_job_progress(job_id: str, status: str, progress: int, current_step: str, **kwargs):
+    """Update job progress in storage"""
+    if job_id in job_storage:
+        job_storage[job_id].update({
+            "status": status,
+            "progress": progress,
+            "current_step": current_step,
+            "last_updated": datetime.now(),
+            **kwargs
+        })
+
+async def process_generation_job(job_id: str, prompt: str, quality: str = "medium"):
+    """Background task to process video generation"""
+    try:
+        # Step 1: Analyzing prompt (5%)
+        await update_job_progress(job_id, "analyzing", 5, "Starting AI analysis of your prompt...")
+        await asyncio.sleep(0.5)  # Brief pause
+        
+        await update_job_progress(job_id, "analyzing", 10, "Understanding mathematical concepts...")
+        await asyncio.sleep(0.5)
+        
+        # Step 2: Generate Manim code (20-40%)
+        await update_job_progress(job_id, "generating", 20, "Calling OpenAI to generate animation code...")
+        ai_result = await ai_service.generate_manim_code(prompt)
+        
+        # Step 3: Save script and validate (45%)
+        await update_job_progress(job_id, "generating", 45, "Saving and validating generated code...")
+        script_path = await file_service.save_generated_script(
+            ai_result["code"], 
+            ai_result["class_name"]
+        )
+        
+        # Step 4: Validate script (55%)
+        await update_job_progress(job_id, "generating", 55, "Running code validation checks...")
+        validation = await manim_service.validate_script(script_path)
+        if not validation["valid"]:
+            await update_job_progress(job_id, "failed", 55, "Code validation failed", 
+                                    error=validation["error"])
+            return
+        
+        # Step 5: Check for existing video first (65%)
+        await update_job_progress(job_id, "rendering", 65, "Preparing video rendering environment...")
+        existing_video = file_service.check_existing_video(ai_result["class_name"])
+        
+        if existing_video:
+            # Use existing video (90%)
+            await update_job_progress(job_id, "rendering", 90, "Found existing render, finalizing...")
+            video_url = file_service.get_video_url(existing_video)
+            await asyncio.sleep(1)  # Brief pause for UI
+            
+            # Complete (100%)
+            await update_job_progress(job_id, "completed", 100, "Animation ready!", 
+                                    video_url=video_url,
+                                    code=ai_result["code"],
+                                    scene_name=ai_result["class_name"],
+                                    description=ai_result["description"],
+                                    method=ai_result.get("method", "unknown"),
+                                    model=ai_result.get("model"),
+                                    sample_used=ai_result.get("sample_used"))
+        else:
+            # Step 6: Render new video (75-95%)
+            await update_job_progress(job_id, "rendering", 75, "Starting Manim video rendering...")
+            
+            # Start actual Manim rendering
+            render_result = await manim_service.render_video(
+                script_path, 
+                ai_result["class_name"],
+                quality
+            )
+            
+            await update_job_progress(job_id, "rendering", 95, "Finalizing video output...")
+            
+            if render_result["success"]:
+                # Complete (100%)
+                await update_job_progress(job_id, "completed", 100, "Animation ready!",
+                                        video_url=render_result["video_url"],
+                                        code=ai_result["code"],
+                                        scene_name=ai_result["class_name"],
+                                        description=ai_result["description"],
+                                        method=ai_result.get("method", "unknown"),
+                                        model=ai_result.get("model"),
+                                        sample_used=ai_result.get("sample_used"))
+            else:
+                # Rendering failed
+                await update_job_progress(job_id, "failed", 90, "Video rendering failed",
+                                        error=render_result["error"])
+                
+    except Exception as e:
+        logger.error(f"Job {job_id} failed: {str(e)}")
+        await update_job_progress(job_id, "failed", 0, "Generation failed", error=str(e))
+
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_animation(request: GenerateRequest, background_tasks: BackgroundTasks):
-    """Generate a mathematical animation from a text prompt"""
+    """Start a mathematical animation generation job"""
     try:
-        logger.info(f"Generating animation for prompt: {request.prompt[:50]}...")
+        # Create unique job ID
+        job_id = str(uuid.uuid4())
         
-        # Step 1: Generate Manim code using AI service (stubbed)
-        ai_result = await ai_service.generate_manim_code(request.prompt)
+        # Initialize job in storage
+        job_storage[job_id] = {
+            "job_id": job_id,
+            "prompt": request.prompt,
+            "quality": request.quality,
+            "status": "initialized",
+            "progress": 0,
+            "current_step": "Starting generation...",
+            "created_at": datetime.now(),
+            "last_updated": datetime.now()
+        }
         
-        # Step 2: Check if pre-rendered video exists
-        video_path = file_service.check_existing_video(ai_result["class_name"])
+        # Start background processing
+        background_tasks.add_task(process_generation_job, job_id, request.prompt, request.quality)
         
-        if video_path:
-            # Use existing video
-            video_url = file_service.get_video_url(video_path)
-            logger.info(f"Using existing video: {video_url}")
-            
-            return GenerateResponse(
-                video_url=video_url,
-                code=ai_result["code"],
-                scene_name=ai_result["class_name"],
-                status="success",
-                description=ai_result["description"]
-            )
-        else:
-            # Need to render new video
-            logger.info("No existing video found, would need to render new one")
-            
-            # Save the generated script
-            script_path = await file_service.save_generated_script(
-                ai_result["code"], 
-                ai_result["class_name"]
-            )
-            
-            # For now, return success without actually rendering
-            # In production, this would trigger actual Manim rendering
-            return GenerateResponse(
-                video_url="/static/placeholder/rendering.mp4",  # Placeholder
-                code=ai_result["code"],
-                scene_name=ai_result["class_name"],
-                status="success",
-                description=f"{ai_result['description']} (New render would be triggered)"
-            )
-            
+        # Return immediate response with job ID
+        return GenerateResponse(
+            video_url="",  # Will be populated when complete
+            code="",       # Will be populated when complete
+            scene_name="",  # Will be populated when complete
+            status="processing",
+            description="Generation started",
+            job_id=job_id,
+            progress=0,
+            current_step="Starting generation..."
+        )
+        
     except Exception as e:
-        logger.error(f"Error generating animation: {str(e)}")
+        logger.error(f"Error starting generation: {str(e)}")
         raise HTTPException(
             status_code=500, 
-            detail=f"Failed to generate animation: {str(e)}"
+            detail=f"Failed to start generation: {str(e)}"
         )
+
+@router.get("/job/{job_id}/status", response_model=JobStatusResponse)
+async def get_job_status(job_id: str):
+    """Get the status of a generation job"""
+    if job_id not in job_storage:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job = job_storage[job_id]
+    
+    return JobStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        progress=job["progress"],
+        current_step=job["current_step"],
+        video_url=job.get("video_url"),
+        code=job.get("code"),
+        scene_name=job.get("scene_name"),
+        error=job.get("error"),
+        method=job.get("method"),
+        model=job.get("model"),
+        sample_used=job.get("sample_used")
+    )
+
+@router.delete("/job/{job_id}")
+async def cleanup_job(job_id: str):
+    """Clean up a completed job"""
+    if job_id in job_storage:
+        del job_storage[job_id]
+        return {"message": "Job cleaned up successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Job not found")
 
 @router.get("/examples", response_model=ExampleResponse)
 async def get_examples():
@@ -134,7 +254,7 @@ async def health_check():
 
 @router.post("/render")
 async def render_video(request: GenerateRequest):
-    """Actually render a video (for testing Manim integration)"""
+    """Direct render endpoint for testing (bypasses job queue)"""
     try:
         # Generate code
         ai_result = await ai_service.generate_manim_code(request.prompt)
@@ -157,7 +277,7 @@ async def render_video(request: GenerateRequest):
         render_result = await manim_service.render_video(
             script_path, 
             ai_result["class_name"],
-            request.quality if hasattr(request, 'quality') else "low_quality"
+            request.quality
         )
         
         if render_result["success"]:
@@ -165,7 +285,8 @@ async def render_video(request: GenerateRequest):
                 "video_url": render_result["video_url"],
                 "code": ai_result["code"],
                 "scene_name": ai_result["class_name"],
-                "status": "rendered"
+                "status": "rendered",
+                "description": ai_result["description"]
             }
         else:
             raise HTTPException(

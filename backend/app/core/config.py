@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     MANIM_QUALITY: str = "low_quality"  # For faster testing: low_quality, medium_quality, high_quality
     MANIM_FORMAT: str = "mp4"
     MANIM_FPS: int = 30
+    MANIM_PYTHON_PATH: str = "python3"  # Python interpreter for running Manim
     
     # Paths - relative to backend directory
     BASE_DIR: Path = Path(__file__).parent.parent.parent
@@ -27,6 +28,13 @@ class Settings(BaseSettings):
     
     # CORS settings
     CORS_ORIGINS: str = "*"
+    
+    # OpenAI settings
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5"
+    OPENAI_MAX_TOKENS: int = 4000
+    OPENAI_TEMPERATURE: float = 0.3
+    OPENAI_TIMEOUT: int = 30
     
     @property
     def cors_origins(self) -> list:

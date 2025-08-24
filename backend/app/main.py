@@ -41,7 +41,7 @@ try:
     
     # Mount output directory for generated videos
     if settings.OUTPUT_VIDEOS_PATH.exists():
-        app.mount("/static/output", StaticFiles(directory=str(settings.OUTPUT_VIDEOS_PATH)), name="output")
+        app.mount("/output", StaticFiles(directory=str(settings.OUTPUT_VIDEOS_PATH)), name="output")
         logger.info(f"Mounted output files from {settings.OUTPUT_VIDEOS_PATH}")
     
     # Mount generated scripts directory

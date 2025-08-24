@@ -11,6 +11,9 @@ class GenerateResponse(BaseModel):
     scene_name: str
     status: str
     description: Optional[str] = None
+    job_id: Optional[str] = None
+    progress: Optional[int] = None
+    current_step: Optional[str] = None
 
 class ExampleItem(BaseModel):
     title: str
@@ -32,3 +35,25 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     details: Optional[str] = None
+
+class ProgressResponse(BaseModel):
+    job_id: str
+    status: str  # 'analyzing', 'generating', 'rendering', 'completed', 'failed'
+    progress: int  # 0-100
+    current_step: str
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    current_step: str
+    estimated_time_remaining: Optional[int] = None  # seconds
+    video_url: Optional[str] = None
+    code: Optional[str] = None
+    scene_name: Optional[str] = None
+    error: Optional[str] = None
+    method: Optional[str] = None  # 'openai_generated' | 'sample_fallback' | 'emergency_fallback'
+    model: Optional[str] = None
+    sample_used: Optional[str] = None

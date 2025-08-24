@@ -4,8 +4,11 @@ import { api, APIError, type GenerateResponse } from '~/services/api';
 // Generation states
 export type GenerationStatus = 
   | 'idle'
+  | 'analyzing'
   | 'generating'
+  | 'rendering'
   | 'completed' 
+  | 'failed'
   | 'error';
 
 export interface GenerationState {
@@ -15,6 +18,10 @@ export interface GenerationState {
   error?: string;
   startTime?: Date;
   completedTime?: Date;
+  jobId?: string;
+  progress: number;
+  currentStep: string;
+  estimatedTimeRemaining?: number;
 }
 
 export interface GenerationContextType {
@@ -30,11 +37,14 @@ const GenerationContext = React.createContext<GenerationContextType | undefined>
 const initialState: GenerationState = {
   status: 'idle',
   prompt: '',
+  progress: 0,
+  currentStep: 'Ready to generate',
 };
 
 // State reducer
 type GenerationAction = 
-  | { type: 'START_GENERATION'; prompt: string }
+  | { type: 'START_GENERATION'; prompt: string; jobId: string }
+  | { type: 'UPDATE_PROGRESS'; progress: number; currentStep: string; status: GenerationStatus }
   | { type: 'GENERATION_SUCCESS'; result: GenerateResponse }
   | { type: 'GENERATION_ERROR'; error: string }
   | { type: 'RESET' }
@@ -45,11 +55,22 @@ function generationReducer(state: GenerationState, action: GenerationAction): Ge
     case 'START_GENERATION':
       return {
         ...state,
-        status: 'generating',
+        status: 'analyzing',
         prompt: action.prompt,
+        jobId: action.jobId,
         error: undefined,
+        progress: 0,
+        currentStep: 'Starting generation...',
         startTime: new Date(),
         completedTime: undefined,
+      };
+    
+    case 'UPDATE_PROGRESS':
+      return {
+        ...state,
+        status: action.status,
+        progress: action.progress,
+        currentStep: action.currentStep,
       };
     
     case 'GENERATION_SUCCESS':
@@ -57,8 +78,10 @@ function generationReducer(state: GenerationState, action: GenerationAction): Ge
         ...state,
         status: 'completed',
         result: action.result,
-        error: undefined,
+        progress: 100,
+        currentStep: 'Complete!',
         completedTime: new Date(),
+        error: undefined,
       };
     
     case 'GENERATION_ERROR':
@@ -66,70 +89,173 @@ function generationReducer(state: GenerationState, action: GenerationAction): Ge
         ...state,
         status: 'error',
         error: action.error,
+        currentStep: 'Generation failed',
         completedTime: new Date(),
+      };
+    
+    case 'RESET':
+      return {
+        ...initialState,
       };
     
     case 'CLEAR_ERROR':
       return {
         ...state,
         error: undefined,
-        status: state.result ? 'completed' : 'idle',
       };
-    
-    case 'RESET':
-      return initialState;
     
     default:
       return state;
   }
 }
 
-// Provider component
-interface GenerationProviderProps {
-  children: React.ReactNode;
-}
-
-export function GenerationProvider({ children }: GenerationProviderProps) {
+export function GenerationProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(generationReducer, initialState);
+  const pollIntervalRef = React.useRef<NodeJS.Timeout>();
 
-  const generateAnimation = React.useCallback(async (prompt: string, quality = 'medium') => {
-    if (!prompt.trim()) {
-      dispatch({ type: 'GENERATION_ERROR', error: 'Please enter a prompt' });
-      return;
-    }
-
-    dispatch({ type: 'START_GENERATION', prompt: prompt.trim() });
-
+  const pollJobStatus = React.useCallback(async (jobId: string) => {
     try {
-      const result = await api.generate({ prompt: prompt.trim(), quality });
-      dispatch({ type: 'GENERATION_SUCCESS', result });
-    } catch (error) {
-      let errorMessage = 'Failed to generate animation';
+      const status = await api.getJobStatus(jobId);
       
+      if (status.status === 'completed') {
+        // Job completed successfully
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+        
+        dispatch({
+          type: 'GENERATION_SUCCESS',
+          result: {
+            video_url: status.video_url || '',
+            code: status.code || '',
+            scene_name: status.scene_name || '',
+            status: 'success',
+            description: 'Animation generated successfully',
+            job_id: jobId,
+            progress: 100,
+            current_step: 'Complete!',
+            method: status.method,
+            model: status.model,
+            sample_used: status.sample_used
+          }
+        });
+      } else if (status.status === 'failed') {
+        // Job failed
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+        
+        dispatch({
+          type: 'GENERATION_ERROR',
+          error: status.error || 'Generation failed'
+        });
+      } else {
+        // Job still in progress
+        const mappedStatus: GenerationStatus = 
+          status.status === 'analyzing' ? 'analyzing' :
+          status.status === 'generating' ? 'generating' :
+          status.status === 'rendering' ? 'rendering' : 'generating';
+          
+        dispatch({
+          type: 'UPDATE_PROGRESS',
+          progress: status.progress,
+          currentStep: status.current_step,
+          status: mappedStatus
+        });
+      }
+    } catch (error) {
+      console.error('Error polling job status:', error);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+      
+      dispatch({
+        type: 'GENERATION_ERROR',
+        error: error instanceof Error ? error.message : 'Failed to check generation status'
+      });
+    }
+  }, []);
+
+  const generateAnimation = React.useCallback(async (prompt: string, quality: string = 'medium') => {
+    try {
+      // Start generation
+      const response = await api.generate({
+        prompt,
+        quality
+      });
+
+      if (response.job_id) {
+        // Start with job-based flow
+        dispatch({
+          type: 'START_GENERATION',
+          prompt,
+          jobId: response.job_id
+        });
+
+        // Start polling for progress
+        pollIntervalRef.current = setInterval(() => {
+          pollJobStatus(response.job_id!);
+        }, 1000); // Poll every second
+
+        // Initial poll
+        setTimeout(() => pollJobStatus(response.job_id!), 500);
+      } else {
+        // Direct response (fallback)
+        dispatch({
+          type: 'GENERATION_SUCCESS',
+          result: response
+        });
+      }
+    } catch (error) {
+      console.error('Generation error:', error);
+      
+      let errorMessage = 'Failed to generate animation';
       if (error instanceof APIError) {
         errorMessage = error.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       
-      dispatch({ type: 'GENERATION_ERROR', error: errorMessage });
+      dispatch({
+        type: 'GENERATION_ERROR',
+        error: errorMessage
+      });
     }
-  }, []);
+  }, [pollJobStatus]);
 
   const reset = React.useCallback(() => {
+    // Clear any polling interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+    
+    // Clean up job if exists
+    if (state.jobId) {
+      api.cleanupJob(state.jobId).catch(console.error);
+    }
+    
     dispatch({ type: 'RESET' });
-  }, []);
+  }, [state.jobId]);
 
   const clearError = React.useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
 
-  const contextValue = React.useMemo(() => ({
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const contextValue: GenerationContextType = {
     state,
     generateAnimation,
     reset,
     clearError,
-  }), [state, generateAnimation, reset, clearError]);
+  };
 
   return (
     <GenerationContext.Provider value={contextValue}>
@@ -138,7 +264,6 @@ export function GenerationProvider({ children }: GenerationProviderProps) {
   );
 }
 
-// Hook to use the generation context
 export function useGeneration() {
   const context = React.useContext(GenerationContext);
   if (context === undefined) {
@@ -147,36 +272,16 @@ export function useGeneration() {
   return context;
 }
 
-// Hook to get generation duration
-export function useGenerationDuration(state: GenerationState): number | null {
-  return React.useMemo(() => {
-    if (!state.startTime) return null;
-    
-    const endTime = state.completedTime || new Date();
-    return endTime.getTime() - state.startTime.getTime();
-  }, [state.startTime, state.completedTime]);
-}
-
-// Hook for URL state synchronization
+// URL state synchronization hook
 export function useGenerationURLState() {
   const { state, generateAnimation } = useGeneration();
-
-  React.useEffect(() => {
-    // Initialize from URL params on mount
-    const searchParams = new URLSearchParams(window.location.search);
-    const promptFromURL = searchParams.get('prompt');
-    
-    if (promptFromURL && state.status === 'idle') {
-      generateAnimation(promptFromURL);
+  
+  return {
+    state,
+    generateFromURL: (prompt: string) => {
+      if (prompt && state.status === 'idle') {
+        generateAnimation(prompt);
+      }
     }
-  }, []);
-
-  // Update URL when generation starts
-  React.useEffect(() => {
-    if (state.status === 'generating' && state.prompt) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('prompt', state.prompt);
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, [state.status, state.prompt]);
+  };
 }

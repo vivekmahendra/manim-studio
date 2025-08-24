@@ -12,6 +12,12 @@ export interface GenerateResponse {
   scene_name: string;
   status: string;
   description?: string;
+  job_id?: string;
+  progress?: number;
+  current_step?: string;
+  method?: string; // 'openai_generated' | 'sample_fallback' | 'emergency_fallback'
+  model?: string;
+  sample_used?: string;
 }
 
 export interface ExampleItem {
@@ -37,6 +43,21 @@ export interface APIError {
   error: string;
   message: string;
   details?: string;
+}
+
+export interface JobStatusResponse {
+  job_id: string;
+  status: string;
+  progress: number;
+  current_step: string;
+  estimated_time_remaining?: number;
+  video_url?: string;
+  code?: string;
+  scene_name?: string;
+  error?: string;
+  method?: string; // 'openai_generated' | 'sample_fallback' | 'emergency_fallback'
+  model?: string;
+  sample_used?: string;
 }
 
 // API Configuration
@@ -111,6 +132,10 @@ class APIClient {
       body: JSON.stringify(data),
     });
   }
+
+  async delete<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, { method: 'DELETE' });
+  }
 }
 
 // API Instance
@@ -136,6 +161,16 @@ export const api = {
   // Render animation (for direct rendering)
   async render(request: GenerateRequest): Promise<GenerateResponse> {
     return apiClient.post<GenerateResponse>('/api/render', request);
+  },
+
+  // Get job status
+  async getJobStatus(jobId: string): Promise<JobStatusResponse> {
+    return apiClient.get<JobStatusResponse>(`/api/job/${jobId}/status`);
+  },
+
+  // Clean up completed job
+  async cleanupJob(jobId: string): Promise<{ message: string }> {
+    return apiClient.delete<{ message: string }>(`/api/job/${jobId}`);
   }
 };
 

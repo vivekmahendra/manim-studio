@@ -1,46 +1,41 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Circle, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, Circle, Loader2, AlertCircle, RefreshCw, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from './ui/Button';
-import { useGeneration, useGenerationDuration } from '~/contexts/GenerationContext';
+import { useGeneration } from '~/contexts/GenerationContext';
 
 interface ProgressStep {
   id: string;
   label: string;
   description: string;
   icon: React.ReactNode;
-  estimatedDuration: number; // in milliseconds
 }
 
 const GENERATION_STEPS: ProgressStep[] = [
   {
     id: 'analyzing',
     label: 'Analyzing Prompt',
-    description: 'Understanding your mathematical concept...',
-    icon: <Circle className="h-5 w-5" />,
-    estimatedDuration: 2000
+    description: 'Understanding your mathematical concept and requirements',
+    icon: <Circle className="h-5 w-5" />
   },
   {
     id: 'generating',
     label: 'Generating Code',
-    description: 'Creating Manim animation script...',
-    icon: <Circle className="h-5 w-5" />,
-    estimatedDuration: 3000
+    description: 'Creating Manim animation script with AI',
+    icon: <Circle className="h-5 w-5" />
   },
   {
     id: 'rendering',
     label: 'Rendering Video',
-    description: 'Producing your animation...',
-    icon: <Circle className="h-5 w-5" />,
-    estimatedDuration: 8000
+    description: 'Producing your high-quality animation',
+    icon: <Circle className="h-5 w-5" />
   },
   {
-    id: 'complete',
+    id: 'completed',
     label: 'Complete',
     description: 'Your animation is ready!',
-    icon: <CheckCircle className="h-5 w-5" />,
-    estimatedDuration: 0
+    icon: <CheckCircle className="h-5 w-5" />
   }
 ];
 
@@ -51,46 +46,56 @@ interface GenerationProgressProps {
 
 export function GenerationProgress({ onRetry, className }: GenerationProgressProps) {
   const { state, clearError } = useGeneration();
-  const duration = useGenerationDuration(state);
-  const [currentStepIndex, setCurrentStepIndex] = React.useState(0);
-
-  // Simulate progress through steps based on time elapsed
+  
+  // Calculate elapsed time
+  const [elapsedTime, setElapsedTime] = React.useState<string>('0s');
+  
   React.useEffect(() => {
-    if (state.status !== 'generating' || !state.startTime) return;
-
-    const updateProgress = () => {
+    if (!state.startTime) return;
+    
+    const updateElapsed = () => {
       const elapsed = Date.now() - state.startTime!.getTime();
-      let cumulativeTime = 0;
-      let newStepIndex = 0;
-
-      for (let i = 0; i < GENERATION_STEPS.length - 1; i++) {
-        cumulativeTime += GENERATION_STEPS[i].estimatedDuration;
-        if (elapsed >= cumulativeTime) {
-          newStepIndex = i + 1;
-        }
+      const seconds = Math.floor(elapsed / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      
+      if (minutes > 0) {
+        setElapsedTime(`${minutes}m ${remainingSeconds}s`);
+      } else {
+        setElapsedTime(`${seconds}s`);
       }
-
-      setCurrentStepIndex(Math.min(newStepIndex, GENERATION_STEPS.length - 2));
     };
-
-    const interval = setInterval(updateProgress, 500);
-    updateProgress(); // Initial update
-
+    
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 1000);
+    
     return () => clearInterval(interval);
-  }, [state.status, state.startTime]);
+  }, [state.startTime]);
 
-  // Reset progress when status changes
-  React.useEffect(() => {
-    if (state.status === 'idle') {
-      setCurrentStepIndex(0);
-    } else if (state.status === 'completed') {
-      setCurrentStepIndex(GENERATION_STEPS.length - 1);
+  // Map status to current step
+  const getCurrentStepIndex = (): number => {
+    switch (state.status) {
+      case 'analyzing': return 0;
+      case 'generating': return 1;
+      case 'rendering': return 2;
+      case 'completed': return 3;
+      case 'error':
+      case 'failed': 
+        // Return the step where error occurred based on progress
+        if (state.progress <= 20) return 0;
+        if (state.progress <= 60) return 1;
+        return 2;
+      default: return 0;
     }
-  }, [state.status]);
+  };
+
+  const currentStepIndex = getCurrentStepIndex();
 
   const getStepStatus = (stepIndex: number) => {
-    if (state.status === 'error') {
-      return stepIndex <= currentStepIndex ? 'error' : 'pending';
+    if (state.status === 'error' || state.status === 'failed') {
+      if (stepIndex < currentStepIndex) return 'completed';
+      if (stepIndex === currentStepIndex) return 'error';
+      return 'pending';
     }
     
     if (state.status === 'completed') {
@@ -99,17 +104,11 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
     
     if (stepIndex < currentStepIndex) {
       return 'completed';
-    } else if (stepIndex === currentStepIndex && state.status === 'generating') {
+    } else if (stepIndex === currentStepIndex) {
       return 'active';
     }
     
     return 'pending';
-  };
-
-  const formatDuration = (ms: number | null): string => {
-    if (!ms) return '0s';
-    const seconds = Math.floor(ms / 1000);
-    return `${seconds}s`;
   };
 
   return (
@@ -117,16 +116,43 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
       {/* Header */}
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          {state.status === 'error' ? 'Generation Failed' : 
-           state.status === 'completed' ? 'Animation Complete!' :
-           'Generating Your Animation'}
+          {state.status === 'error' || state.status === 'failed' 
+            ? 'Generation Failed' 
+            : state.status === 'completed' 
+            ? 'Animation Complete!' 
+            : 'Generating Your Animation'}
         </h2>
-        <p className="text-gray-600 dark:text-gray-400">
+        
+        <p className="text-gray-600 dark:text-gray-400 mb-2">
           {state.prompt && `"${state.prompt}"`}
         </p>
-        {duration && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Duration: {formatDuration(duration)}
+        
+        {/* Real-time status */}
+        <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center space-x-1">
+            <Clock className="h-4 w-4" />
+            <span>{elapsedTime}</span>
+          </div>
+          
+          {state.progress > 0 && (
+            <div className="flex items-center space-x-2">
+              <span>{state.progress}%</span>
+              <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-blue-500 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${state.progress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Current step description */}
+        {state.currentStep && (
+          <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 font-medium">
+            {state.currentStep}
           </p>
         )}
       </div>
@@ -141,9 +167,9 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
               key={step.id}
               className={clsx(
                 'flex items-start space-x-4 p-4 rounded-lg transition-all duration-300',
-                status === 'active' && 'bg-blue-50 dark:bg-blue-900/20',
+                status === 'active' && 'bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-200 dark:ring-blue-800',
                 status === 'completed' && 'bg-green-50 dark:bg-green-900/20',
-                status === 'error' && 'bg-red-50 dark:bg-red-900/20'
+                status === 'error' && 'bg-red-50 dark:bg-red-900/20 ring-2 ring-red-200 dark:ring-red-800'
               )}
               initial={{ opacity: 0.5 }}
               animate={{ 
@@ -191,6 +217,8 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
                 )}>
                   {status === 'error' && index === currentStepIndex 
                     ? 'An error occurred during this step' 
+                    : status === 'active' && index === currentStepIndex && state.currentStep
+                    ? state.currentStep
                     : step.description}
                 </p>
               </div>
@@ -200,7 +228,7 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
       </div>
 
       {/* Error handling */}
-      {state.status === 'error' && (
+      {(state.status === 'error' || state.status === 'failed') && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -213,7 +241,7 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
                 Generation Failed
               </h4>
               <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                {state.error}
+                {state.error || 'An unexpected error occurred during generation.'}
               </p>
             </div>
           </div>
@@ -251,6 +279,12 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">Animation generated successfully!</span>
           </div>
+          
+          {state.completedTime && state.startTime && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Total time: {Math.round((state.completedTime.getTime() - state.startTime.getTime()) / 1000)}s
+            </p>
+          )}
         </motion.div>
       )}
     </div>

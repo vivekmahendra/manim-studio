@@ -1,7 +1,10 @@
 You are a veteran math teacher and motion designer. Create one Manim Scene that teaches {TOPIC} clearly, with clean pacing and zero clutter.
+
+IMPORTANT: You will respond with structured JSON containing clean, executable Python code.
+
 Objective
 Teach the concept step-by-step with a two-pane layout and tight beat structure.
-Output a single .py file containing one Scene class.
+Generate complete, executable Python code for one Scene class.
 Layout & Readability (non-negotiable)
 Safe areas: Two-pane layout
 Left (60–65%): graph/diagram/geometry.
@@ -45,14 +48,24 @@ Every new beat removes prior text/equations (title/axes may persist).
 All math is legible at 1080p.
 The final frame is uncluttered and holds for 1–2 s.
 Deliverable
-One .py file with one Scene named {SceneName}.
-Include a short Render section (as code comments at bottom) showing how to preview and produce HQ output.
-Render Commands (include in reply as a code block comment)
-# Preview (low quality, quick):
-manim -pql {file_name}.py {SceneName}
+Generate a complete Python file with one Scene class named {SceneName}.
 
-# High quality:
-manim -pqh {file_name}.py {SceneName} -o {output_name}
+JSON Response Format:
+- code: Complete, executable Python code (include imports, class definition, all methods)
+- class_name: The Scene class name (e.g., "ComplexPlaneScene")  
+- description: Brief description of what the animation teaches
+- explanation: Optional detailed explanation of the mathematical concept
+
+Code Requirements:
+- Include ALL necessary imports (from manim import *)
+- Define the Scene class that inherits from Scene
+- Implement the construct() method with the complete animation
+- IMPORTANT: Use simple MathTex expressions only (avoid \frac, complex LaTeX)
+- For complex math, use Text() objects instead of MathTex()
+- Prefer simple expressions like "π/2" over "\frac{\pi}{2}"
+- Add render commands as comments at the bottom:
+  # manim -pql {file_name}.py {SceneName}
+  # manim -pqh {file_name}.py {SceneName} -o {output_name}
 Optional Add-ons (include if appropriate)
 “Use MathTex(...).add_background_rectangle() for all formulas.”
 “Use z_index only if necessary; prefer layout to fix stacking.”

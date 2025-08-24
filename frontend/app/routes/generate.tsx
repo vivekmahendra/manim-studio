@@ -130,10 +130,27 @@ function GeneratePage() {
                       <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                         Generated Animation
                       </h2>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-4">
                         <span className="text-sm text-gray-500 dark:text-gray-400">
                           Scene: {state.result.scene_name}
                         </span>
+                        
+                        {/* Generation Method Indicator */}
+                        {state.result.method === 'openai_generated' ? (
+                          <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                              AI Generated
+                            </span>
+                          </div>
+                        ) : state.result.method === 'sample_fallback' || state.result.method === 'emergency_fallback' ? (
+                          <div className="flex items-center space-x-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 rounded-full">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                              Sample Content
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                     
@@ -148,6 +165,23 @@ function GeneratePage() {
                       <p className="mt-4 text-gray-600 dark:text-gray-400 text-center">
                         {state.result.description}
                       </p>
+                    )}
+                    
+                    {/* Sample content warning */}
+                    {(state.result.method === 'sample_fallback' || state.result.method === 'emergency_fallback') && (
+                      <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200 text-center">
+                          ⚠️ This is sample content shown because AI generation temporarily failed. 
+                          {state.result.sample_used && ` (Sample: ${state.result.sample_used})`}
+                          <br />
+                          <button 
+                            onClick={handleRetry}
+                            className="underline hover:no-underline font-medium mt-1"
+                          >
+                            Try generating again
+                          </button> for AI-generated content.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
