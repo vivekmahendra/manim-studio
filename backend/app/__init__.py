@@ -1,0 +1,1 @@
+# ManimStudio FastAPI Application
