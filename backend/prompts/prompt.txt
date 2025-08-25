@@ -1,88 +1,17 @@
-You are a veteran math teacher and motion designer. Create one Manim Scene that teaches {TOPIC} clearly, with clean pacing and zero clutter.
+Create a Manim Scene that teaches {TOPIC}. 
 
-IMPORTANT: You will respond with structured JSON containing clean, executable Python code.
+Requirements:
+- Use `from manim import *` 
+- Create one Scene class
+- Include a construct() method
+- Return only Python code, no explanations
 
-Objective
-Teach the concept step-by-step with a two-pane layout and tight beat structure.
-Generate complete, executable Python code for one Scene class.
-Layout & Readability (non-negotiable)
-Safe areas: Two-pane layout
-Left (60–65%): graph/diagram/geometry.
-Right (35–40%): “board” (bulleted text).
-Never place text over graphs (text lives on the right board only).
-One idea per beat: at most 1 equation + 1 visual + 1 small label group on screen.
-No overlap ever: before showing new text/equations, FadeOut the old ones. Manage removable items in VGroups.
-Title discipline: small, single-line title to_edge(UP) with a top margin; do not collide with content below.
-Contrast: add add_background_rectangle(opacity=0.15) (or a light rounded panel) behind equations/text over dark backgrounds.
-Scaling: ensure math fits—use scale_to_fit_width() or reduce font_size so nothing touches edges.
-Pacing & Transitions
-Structure the lesson into short beats (5–15 s). For each beat:
-Right board: introduce a single statement/formula.
-Left pane: show or update the visual.
-Pause: wait(0.5–1.0) to breathe.
-Transitions: only FadeIn, Create, TransformFromCopy, FadeOut.
-Board API (to avoid clutter)
-Implement a helper on the Scene:
-def show_board(self, *lines, title=None):
-    """
-    - FadeOut previous board group (if any).
-    - Render a rounded, light panel on the right pane with 2–5 concise bullet lines.
-    - Store the current board group on self.board_group for clean replacement later.
-    """
-Implementation requirements:
-Keep the board in the right 35–40% pane; use SurroundingRectangle with corner_radius parameter (NOT corner radius).
-For surrounding rectangles, use NO buffer parameters - use ONLY default surround() method without arguments.
-Bullets must be concise (≤ ~10–12 words each).
-Persist only the title and axes across beats by default; everything else is replaceable.
+Example structure:
+```python
+from manim import *
 
-CRITICAL API RULES (must follow exactly):
-- Use SurroundingRectangle(mobject, corner_radius=0.1) for backgrounds
-- Use surround() method WITHOUT any parameters: background.surround(content) 
-- NEVER use surround(buffer=...) or surround(buffer_factor=...) - these don't exist
-- NEVER use get_tangent_line() - this method has incompatible parameters
-- For tangent lines, use axes.plot() with the tangent line equation instead
-- Use simple positioning: to_corner(), to_edge(), shift() methods
-Graphing & Styling Rules
-Axes anchored in the left pane; labels small.
-Colors (consistent):
-main curve = BLUE or GREEN
-asymptotes = GRAY (dashed)
-vertices/foci/special points = YELLOW/RED
-Ticks: low density; avoid tiny, unreadable labels.
-Prefer layout fixes over z_index; only use z_index if necessary.
-Acceptance Checklist (self-check)
-At no time do two full equations overlap.
-Board text never covers axes/curves.
-Every new beat removes prior text/equations (title/axes may persist).
-All math is legible at 1080p.
-The final frame is uncluttered and holds for 1–2 s.
-Deliverable
-Generate a complete Python file with one Scene class named {SceneName}.
-
-JSON Response Format:
-- code: Complete, executable Python code (include imports, class definition, all methods)
-- class_name: The Scene class name (e.g., "ComplexPlaneScene")  
-- description: Brief description of what the animation teaches
-- explanation: Optional detailed explanation of the mathematical concept
-
-Code Requirements:
-- Include ALL necessary imports (from manim import *)
-- Define the Scene class that inherits from Scene
-- Implement the construct() method with the complete animation
-- IMPORTANT: Use simple MathTex expressions only (avoid \frac, complex LaTeX)
-- For complex math, use Text() objects instead of MathTex()
-- Prefer simple expressions like "π/2" over "\frac{\pi}{2}"
-- Add render commands as comments at the bottom:
-  # manim -ql {file_name}.py {SceneName}
-  # manim -qh {file_name}.py {SceneName} -o {output_name}
-Optional Add-ons (include if appropriate)
-“Use MathTex(...).add_background_rectangle() for all formulas.”
-“Use z_index only if necessary; prefer layout to fix stacking.”
-“If both horizontal and vertical hyperbolas are shown, replace the branches when switching cases.”
-Minimal Beat Template (guidance for the LLM)
-Setup: Create title (persist), left axes (persist), define show_board.
-Beat 1: show_board("Key idea #1", "Short support line"); draw first visual (Create).
-Beat 2: show_board("Equation A = ..."); TransformFromCopy from labels to MathTex; update curve.
-Beat 3: show_board("Interpretation / property"); reveal asymptotes (GRAY dashed).
-Beat 4: show_board("Example: ..."); annotate one point (YELLOW), short label group.
-Final: FadeOut transient items; hold clean summary board or clean figure for 1–2 s.
+class MyScene(Scene):
+    def construct(self):
+        # Your animation code here
+        pass
+```

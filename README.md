@@ -2,6 +2,12 @@
 
 Transform mathematical concepts into beautiful animations using natural language. ManimStudio combines the power of AI with the Manim animation library to create professional mathematical visualizations from simple text descriptions.
 
+## 🎥 Demo
+
+![ManimStudio Demo](demo.gif)
+
+*Watch ManimStudio generate mathematical animations from natural language descriptions in real-time.*
+
 ## 🎬 Features
 
 - **Natural Language to Animation**: Simply describe what you want to visualize
