@@ -66,6 +66,10 @@ class FileService:
     
     def get_video_url(self, video_path: str) -> str:
         """Convert video path to URL"""
+        # If this is a newly generated video (in output directory), use /output/
+        if video_path.endswith('.mp4') and not video_path.startswith('videos/'):
+            return f"/output/{video_path}"
+        # Otherwise, use /static/ for sample videos from media directory
         return f"/static/{video_path}"
     
     async def cleanup_old_files(self, max_age_hours: int = 24):
@@ -86,9 +90,12 @@ class FileService:
             if file_age > max_age_seconds:
                 file_path.unlink()
     
-    def generate_unique_filename(self, base_name: str, extension: str) -> str:
-        """Generate a unique filename"""
+    def generate_unique_filename(self, base_name: str, extension: str, job_id: str = None) -> str:
+        """Generate a unique filename with optional job_id"""
         unique_id = uuid.uuid4().hex[:8]
+        if job_id:
+            # Include job_id in filename for better tracking
+            return f"{base_name}_{job_id}_{unique_id}.{extension}"
         return f"{base_name}_{unique_id}.{extension}"
     
     def list_sample_videos(self) -> List[dict]:

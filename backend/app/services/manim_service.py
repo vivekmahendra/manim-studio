@@ -16,17 +16,17 @@ class ManimService:
         self.quality = settings.MANIM_QUALITY
         self.timeout = settings.VIDEO_TIMEOUT
         
-    async def render_video(self, script_path: Path, scene_name: str, quality: str = None) -> Dict[str, Any]:
+    async def render_video(self, script_path: Path, scene_name: str, quality: str = None, job_id: str = None) -> Dict[str, Any]:
         """Render a Manim script to video"""
         if quality is None:
             quality = self.quality
             
-        # Generate output filename
-        output_filename = file_service.generate_unique_filename(scene_name, "mp4")
+        # Generate output filename with job_id for better tracking
+        output_filename = file_service.generate_unique_filename(scene_name, "mp4", job_id)
         output_path = self.output_path / output_filename
         
-        # Build manim command exactly like the generated file comments show
-        quality_flag = "-pql" if "low" in quality else "-pqh"
+        # Build manim command without preview flag (removes desktop video opening)
+        quality_flag = "-ql" if "low" in quality else "-qh"
         
         cmd = [
             settings.MANIM_PYTHON_PATH,  # Use configured Python interpreter
@@ -60,39 +60,50 @@ class ManimService:
                 script_name = script_path.stem
                 quality_dir = "480p15" if "l" in quality_flag else "720p30"
                 
-                # Look for the generated video
+                # Look for the generated video in expected path
                 manim_output_path = script_path.parent / "media" / "videos" / script_name / quality_dir / f"{scene_name}.mp4"
                 
-                logger.info(f"🔍 Looking for video at: {manim_output_path}")
+                logger.info(f"🔍 Looking for video at expected path: {manim_output_path}")
                 
-                if manim_output_path.exists():
+                if manim_output_path.exists() and manim_output_path.stat().st_size > 1000:  # Ensure it's not just a tiny partial file
                     # Move the video to our output directory
                     import shutil
                     shutil.move(str(manim_output_path), str(output_path))
                     
+                    video_url = f"/output/{output_filename}"
                     logger.info(f"✅ Video rendered and moved successfully: {output_filename}")
+                    logger.info(f"🔗 Video URL: {video_url}")
                     return {
                         "success": True,
                         "video_path": output_filename,
-                        "video_url": f"/output/{output_filename}",  # Fixed path to match /output mounting
+                        "video_url": video_url,
                         "message": "Video rendered successfully"
                     }
                 else:
                     # Search for any .mp4 files in the media directory
                     media_dir = script_path.parent / "media"
                     if media_dir.exists():
-                        video_files = list(media_dir.rglob("*.mp4"))
-                        logger.info(f"🔍 Found video files: {[str(f) for f in video_files]}")
+                        all_video_files = list(media_dir.rglob("*.mp4"))
+                        # Filter out tiny files (likely partial renders)
+                        video_files = [f for f in all_video_files if f.stat().st_size > 1000]
+                        logger.info(f"🔍 Found video files: {[(str(f), f.stat().st_size) for f in all_video_files]}")
+                        logger.info(f"🔍 Filtered video files (>1KB): {[(str(f), f.stat().st_size) for f in video_files]}")
                         
                         if video_files:
-                            # Use the first video file found
+                            # Find the largest video file (likely the complete render)
+                            largest_video = max(video_files, key=lambda f: f.stat().st_size)
+                            logger.info(f"📊 Video file sizes: {[(f.name, f.stat().st_size) for f in video_files]}")
+                            logger.info(f"✅ Selected largest video: {largest_video.name} ({largest_video.stat().st_size} bytes)")
+                            
                             import shutil
-                            shutil.move(str(video_files[0]), str(output_path))
+                            shutil.move(str(largest_video), str(output_path))
+                            video_url = f"/output/{output_filename}"
                             logger.info(f"✅ Video found and moved: {output_filename}")
+                            logger.info(f"🔗 Video URL: {video_url}")
                             return {
                                 "success": True,
                                 "video_path": output_filename,
-                                "video_url": f"/output/{output_filename}",
+                                "video_url": video_url,
                                 "message": "Video rendered successfully"
                             }
                     
@@ -134,6 +145,8 @@ class ManimService:
             }
         except FileNotFoundError as e:
             logger.error(f"❌ File not found during rendering: {str(e)}")
+            logger.error(f"❌ Attempted to use Python path: {settings.MANIM_PYTHON_PATH}")
+            logger.error(f"❌ Command: {' '.join(cmd)}")
             error_msg = f"Python interpreter '{settings.MANIM_PYTHON_PATH}' not found. Please check MANIM_PYTHON_PATH setting in .env file."
             return {
                 "success": False,

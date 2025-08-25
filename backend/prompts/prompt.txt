@@ -30,9 +30,18 @@ def show_board(self, *lines, title=None):
     - Store the current board group on self.board_group for clean replacement later.
     """
 Implementation requirements:
-Keep the board in the right 35–40% pane; use a rounded panel Rectangle (or SurroundingRectangle with corner radius) with subtle fill and stroke.
+Keep the board in the right 35–40% pane; use SurroundingRectangle with corner_radius parameter (NOT corner radius).
+For surrounding rectangles, use NO buffer parameters - use ONLY default surround() method without arguments.
 Bullets must be concise (≤ ~10–12 words each).
 Persist only the title and axes across beats by default; everything else is replaceable.
+
+CRITICAL API RULES (must follow exactly):
+- Use SurroundingRectangle(mobject, corner_radius=0.1) for backgrounds
+- Use surround() method WITHOUT any parameters: background.surround(content) 
+- NEVER use surround(buffer=...) or surround(buffer_factor=...) - these don't exist
+- NEVER use get_tangent_line() - this method has incompatible parameters
+- For tangent lines, use axes.plot() with the tangent line equation instead
+- Use simple positioning: to_corner(), to_edge(), shift() methods
 Graphing & Styling Rules
 Axes anchored in the left pane; labels small.
 Colors (consistent):
@@ -64,8 +73,8 @@ Code Requirements:
 - For complex math, use Text() objects instead of MathTex()
 - Prefer simple expressions like "π/2" over "\frac{\pi}{2}"
 - Add render commands as comments at the bottom:
-  # manim -pql {file_name}.py {SceneName}
-  # manim -pqh {file_name}.py {SceneName} -o {output_name}
+  # manim -ql {file_name}.py {SceneName}
+  # manim -qh {file_name}.py {SceneName} -o {output_name}
 Optional Add-ons (include if appropriate)
 “Use MathTex(...).add_background_rectangle() for all formulas.”
 “Use z_index only if necessary; prefer layout to fix stacking.”

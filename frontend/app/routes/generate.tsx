@@ -19,7 +19,7 @@ export function meta({}: Route.MetaArgs) {
 
 function GeneratePage() {
   const [searchParams] = useSearchParams();
-  const { state, generateAnimation, reset } = useGeneration();
+  const { state, generateAnimation, reset, isGenerating } = useGeneration();
 
   // Initialize generation from URL
   React.useEffect(() => {
@@ -94,7 +94,7 @@ function GeneratePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
           {/* Progress Section */}
-          {(state.status === 'generating' || state.status === 'error') && (
+          {(state.status !== 'idle' && state.status !== 'completed') && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -202,9 +202,10 @@ function GeneratePage() {
                   variant="primary" 
                   size="lg"
                   onClick={handleRetry}
+                  disabled={isGenerating()}
                 >
-                  <RefreshCw className="h-5 w-5 mr-2" />
-                  Generate Another Version
+                  <RefreshCw className={`h-5 w-5 mr-2 ${isGenerating() ? 'animate-spin' : ''}`} />
+                  {isGenerating() ? 'Generating...' : 'Generate Another Version'}
                 </Button>
                 
                 <Button 

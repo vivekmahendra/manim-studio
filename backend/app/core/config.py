@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     MANIM_QUALITY: str = "low_quality"  # For faster testing: low_quality, medium_quality, high_quality
     MANIM_FORMAT: str = "mp4"
     MANIM_FPS: int = 30
-    MANIM_PYTHON_PATH: str = "python3"  # Python interpreter for running Manim
+    MANIM_PYTHON_PATH: str = "/usr/bin/python3"  # Python interpreter for running Manim
     
     # Paths - relative to backend directory
     BASE_DIR: Path = Path(__file__).parent.parent.parent

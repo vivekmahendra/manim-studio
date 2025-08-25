@@ -38,6 +38,12 @@ async def update_job_progress(job_id: str, status: str, progress: int, current_s
             "last_updated": datetime.now(),
             **kwargs
         })
+        # Log video URL when it gets set
+        video_url = kwargs.get("video_url")
+        if video_url:
+            logger.info(f"📊 Job {job_id}: {status} ({progress}%) - {current_step} | Video URL: {video_url}")
+        else:
+            logger.info(f"📊 Job {job_id}: {status} ({progress}%) - {current_step}")
 
 async def process_generation_job(job_id: str, prompt: str, quality: str = "medium"):
     """Background task to process video generation"""
@@ -91,11 +97,12 @@ async def process_generation_job(job_id: str, prompt: str, quality: str = "mediu
             # Step 6: Render new video (75-95%)
             await update_job_progress(job_id, "rendering", 75, "Starting Manim video rendering...")
             
-            # Start actual Manim rendering
+            # Start actual Manim rendering with job_id for filename tracking
             render_result = await manim_service.render_video(
                 script_path, 
                 ai_result["class_name"],
-                quality
+                quality,
+                job_id  # Pass job_id for unique filename generation
             )
             
             await update_job_progress(job_id, "rendering", 95, "Finalizing video output...")

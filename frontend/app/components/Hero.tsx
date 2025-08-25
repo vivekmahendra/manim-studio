@@ -18,7 +18,7 @@ export function Hero() {
   ];
 
   const handleGenerate = () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || isGenerating) return;
     
     setIsGenerating(true);
     // Navigate to generation page with prompt
@@ -150,7 +150,8 @@ export function Hero() {
                     <button
                       key={i}
                       onClick={() => handleExampleClick(example)}
-                      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200"
+                      disabled={isGenerating}
+                      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {example}
                     </button>

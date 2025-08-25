@@ -29,6 +29,7 @@ export interface GenerationContextType {
   generateAnimation: (prompt: string, quality?: string) => Promise<void>;
   reset: () => void;
   clearError: () => void;
+  isGenerating: () => boolean;
 }
 
 const GenerationContext = React.createContext<GenerationContextType | undefined>(undefined);
@@ -112,15 +113,23 @@ function generationReducer(state: GenerationState, action: GenerationAction): Ge
 export function GenerationProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(generationReducer, initialState);
   const pollIntervalRef = React.useRef<NodeJS.Timeout>();
+  const pollErrorCountRef = React.useRef<number>(0);
 
   const pollJobStatus = React.useCallback(async (jobId: string) => {
     try {
+      console.log('🔍 Polling job status:', jobId);
       const status = await api.getJobStatus(jobId);
+      console.log('📋 Job status response:', jobId, status.status, status.progress);
+      
+      // Reset error count on successful poll
+      pollErrorCountRef.current = 0;
       
       if (status.status === 'completed') {
         // Job completed successfully
+        console.log('✅ Job completed successfully:', jobId);
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = undefined;
         }
         
         dispatch({
@@ -141,8 +150,10 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         });
       } else if (status.status === 'failed') {
         // Job failed
+        console.log('❌ Job failed:', jobId, status.error);
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = undefined;
         }
         
         dispatch({
@@ -165,8 +176,22 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       }
     } catch (error) {
       console.error('Error polling job status:', error);
+      
+      // Increment error count
+      pollErrorCountRef.current += 1;
+      
+      // Allow up to 3 consecutive polling errors before giving up
+      if (pollErrorCountRef.current < 3) {
+        console.log(`⚠️ Polling error ${pollErrorCountRef.current}/3, will retry...`);
+        // Don't stop polling - let it retry on next interval
+        return;
+      }
+      
+      // Too many consecutive errors - stop polling and show error
+      console.error('❌ Too many polling errors, stopping job monitoring');
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = undefined;
       }
       
       dispatch({
@@ -177,14 +202,47 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const generateAnimation = React.useCallback(async (prompt: string, quality: string = 'medium') => {
+    // Prevent double submission - only allow if idle or if previous generation failed/completed
+    if (state.status !== 'idle' && state.status !== 'completed' && state.status !== 'error' && state.status !== 'failed') {
+      console.log('Generation already in progress, ignoring request');
+      return;
+    }
+
     try {
+      console.log('🚀 Starting new generation:', prompt);
+      
+      // Clear any existing polling interval first
+      if (pollIntervalRef.current) {
+        console.log('⏹️ Stopping old polling interval');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = undefined;
+      }
+      
+      // Reset polling error count for new generation
+      pollErrorCountRef.current = 0;
+
+      // Clean up previous job if exists - WAIT for it to complete
+      if (state.jobId) {
+        console.log('🧹 Cleaning up previous job:', state.jobId);
+        try {
+          await api.cleanupJob(state.jobId);
+          console.log('✅ Previous job cleaned up successfully');
+        } catch (error) {
+          console.error('❌ Failed to cleanup previous job:', error);
+          // Continue anyway - don't let cleanup failure block new generation
+        }
+      }
+
       // Start generation
+      console.log('📡 Calling API to generate...');
       const response = await api.generate({
         prompt,
         quality
       });
 
       if (response.job_id) {
+        console.log('🎯 New job created:', response.job_id);
+        
         // Start with job-based flow
         dispatch({
           type: 'START_GENERATION',
@@ -193,6 +251,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         });
 
         // Start polling for progress
+        console.log('📊 Starting polling for job:', response.job_id);
         pollIntervalRef.current = setInterval(() => {
           pollJobStatus(response.job_id!);
         }, 1000); // Poll every second
@@ -221,7 +280,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         error: errorMessage
       });
     }
-  }, [pollJobStatus]);
+  }, [pollJobStatus, state.status, state.jobId]);
 
   const reset = React.useCallback(() => {
     // Clear any polling interval
@@ -241,6 +300,10 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
 
+  const isGenerating = React.useCallback(() => {
+    return state.status !== 'idle' && state.status !== 'completed' && state.status !== 'error' && state.status !== 'failed';
+  }, [state.status]);
+
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
@@ -255,6 +318,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     generateAnimation,
     reset,
     clearError,
+    isGenerating,
   };
 
   return (

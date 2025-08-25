@@ -50,3 +50,10 @@ coverage.xml
 *.swp
 *.swo
 .idea/
+
+
+/backend/generated/
+/backend/output/
+
+/backend/.env
+/frontend/.env

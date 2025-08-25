@@ -45,7 +45,7 @@ interface GenerationProgressProps {
 }
 
 export function GenerationProgress({ onRetry, className }: GenerationProgressProps) {
-  const { state, clearError } = useGeneration();
+  const { state, clearError, isGenerating } = useGeneration();
   
   // Calculate elapsed time
   const [elapsedTime, setElapsedTime] = React.useState<string>('0s');
@@ -251,10 +251,11 @@ export function GenerationProgress({ onRetry, className }: GenerationProgressPro
               variant="outline"
               size="sm"
               onClick={onRetry}
+              disabled={isGenerating()}
               className="border-red-300 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
+              <RefreshCw className={`h-4 w-4 mr-2 ${isGenerating() ? 'animate-spin' : ''}`} />
+              {isGenerating() ? 'Generating...' : 'Try Again'}
             </Button>
             <Button
               variant="ghost"
