@@ -258,17 +258,17 @@ npm test
 
 ### Cleaning Up
 
-To clean generated files and cache:
+The project includes a cleanup script that safely removes all generated files, rendered videos, and cache files while preserving the directory structure.
+
+#### Using the Cleanup Script
 
 ```bash
-# Run the cleanup script
+# Run from project root
 ./cleanup.sh
 
-# Or manually:
-rm -rf backend/generated/*
-rm -rf backend/output/*
-rm -rf backend/media/
 ```
+
+**Note**: The backend server will automatically recreate these directories when needed.
 
 ## 📚 Examples
 
