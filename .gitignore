@@ -52,8 +52,16 @@ coverage.xml
 .idea/
 
 
+# Manim and generated content
 /backend/generated/
 /backend/output/
+/backend/media/
+/backend/testing/*/media/
+/backend/testing/*/*.mp4
+/backend/testing/*/*.mov
+/backend/testing/*/*.png
+/backend/testing/*/*.jpg
 
+# Environment files
 /backend/.env
 /frontend/.env
