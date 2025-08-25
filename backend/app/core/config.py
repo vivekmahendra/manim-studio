@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     
     # OpenAI settings
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-5"
+    OPENAI_API_KEY: str = ""  # Must be set in .env file
+    OPENAI_MODEL: str = "gpt-4o"
     OPENAI_MAX_TOKENS: int = 4000
     OPENAI_TEMPERATURE: float = 0.3
     OPENAI_TIMEOUT: int = 30
